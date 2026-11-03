@@ -1042,7 +1042,299 @@ export function createStudentView() {
 
       return container;
     },
-    renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
+    renderVulnerabilities(context = {}) {
+      const { status = 'idle', mode, data, error } = context || {};
+      const container = document.createElement('div');
+      container.className = 'student-vulnerabilities-container';
+
+      const modeText = getModeText(mode);
+
+      // 1. 조회 전 (idle)
+      if (status === 'idle') {
+        const idleEl = document.createElement('p');
+        idleEl.className = 'state state-empty';
+        idleEl.textContent = '조회 전';
+        container.appendChild(idleEl);
+
+        const idleNotice = document.createElement('p');
+        idleNotice.className = 'muted';
+        idleNotice.textContent = '프로젝트에 설치된 패키지의 알려진 취약점을 확인하려면 제공 화면의 조회 버튼을 직접 누르세요.';
+        container.appendChild(idleNotice);
+
+        if (modeText) {
+          const modeBadge = document.createElement('span');
+          modeBadge.className = 'tag tag-demo';
+          modeBadge.textContent = modeText;
+          container.appendChild(modeBadge);
+        }
+        return container;
+      }
+
+      // 2. 조회 중 (loading)
+      if (status === 'loading') {
+        const loadingEl = document.createElement('p');
+        loadingEl.className = 'state state-loading';
+        loadingEl.textContent = '조회 중';
+        container.appendChild(loadingEl);
+
+        const loadingNotice = document.createElement('p');
+        loadingNotice.className = 'muted';
+        loadingNotice.textContent = '설치된 패키지 메타데이터와 OSV 취약점 정보를 대조하는 중입니다. 이전 결과는 유지되지 않습니다.';
+        container.appendChild(loadingNotice);
+
+        if (modeText) {
+          const modeBadge = document.createElement('span');
+          modeBadge.className = 'tag tag-demo';
+          modeBadge.textContent = modeText;
+          container.appendChild(modeBadge);
+        }
+        return container;
+      }
+
+      // 3. 조회 실패 (error)
+      if (status === 'error') {
+        const errorBox = document.createElement('div');
+        errorBox.className = 'student-error-box';
+
+        const code = error?.code || 'UNVERIFIED';
+        const msg = error?.message || '패키지 취약점 조회 중 오류가 발생했습니다.';
+
+        const errorTitle = document.createElement('p');
+        errorTitle.className = 'student-error';
+        errorTitle.textContent = `조회 실패: [${code}] ${msg}`;
+        errorBox.appendChild(errorTitle);
+
+        const errorNotice = document.createElement('p');
+        errorNotice.className = 'muted';
+        errorNotice.textContent = '조회가 실패하여 현재 취약점 여부를 확인할 수 없습니다. (조회 실패는 취약점 없음이 아닙니다. 이전 표는 남기지 않습니다.)';
+        errorBox.appendChild(errorNotice);
+
+        container.appendChild(errorBox);
+
+        if (modeText) {
+          const modeBadge = document.createElement('span');
+          modeBadge.className = 'tag tag-demo';
+          modeBadge.textContent = modeText;
+          container.appendChild(modeBadge);
+        }
+        return container;
+      }
+
+      // 4. 정상 조회 응답 (ok)
+      if (status === 'ok') {
+        const scanData = data || {};
+        const scanStatus = scanData.status || 'unverifiable';
+
+        // 전체 조회 상태 라벨 매핑
+        const SCAN_STATUS_MAP = {
+          complete: '모두 조회(complete)',
+          partial: '일부 조회 실패(partial)',
+          not_checked: '아직 조회 안 함(not_checked)',
+          not_configured: '조회 준비 미완료(not_configured)',
+          unverifiable: 'lock 파일 확인 불가(unverifiable)',
+        };
+        const scanStatusText = SCAN_STATUS_MAP[scanStatus] || `${scanStatus}(unknown)`;
+
+        const headerBox = document.createElement('div');
+        headerBox.className = 'student-vulnerabilities-header';
+
+        const statusHeading = document.createElement('h3');
+        statusHeading.textContent = `전체 조회 상태: ${scanStatusText}`;
+        headerBox.appendChild(statusHeading);
+
+        // 상태별 부가 설명
+        const statusDesc = document.createElement('p');
+        statusDesc.className = 'student-vulnerabilities-desc muted';
+        if (scanStatus === 'not_configured') {
+          statusDesc.textContent = '조회 준비 미완료: 대상 프로젝트 설정이 필요합니다. 대상 경로나 허용 패키지 설정이 비어 있는 상태입니다.';
+        } else if (scanStatus === 'not_checked') {
+          statusDesc.textContent = '아직 조회 안 함: 승인된 공개 조회 대상이 없거나 조회를 시작하지 않았습니다. (취약점 없음이 아닙니다.)';
+        } else if (scanStatus === 'unverifiable') {
+          statusDesc.textContent = 'lock 파일 확인 불가: package-lock.json 또는 설치 메타데이터를 확인할 수 없습니다. (취약점 없음이 아닙니다.)';
+        } else if (scanStatus === 'partial') {
+          statusDesc.textContent = '일부 조회 실패: 일부 패키지의 OSV 조회가 실패했습니다. 이미 수신된 결과만 보존하여 표시합니다.';
+        } else if (scanStatus === 'complete') {
+          statusDesc.textContent = '모두 조회 완료: 허용된 모든 대상 패키지의 조회가 완료되었습니다.';
+        }
+        headerBox.appendChild(statusDesc);
+
+        // lockfile 메타데이터 요약 (lockfileVersion, lockfileHash, checkedAt)
+        const metaDl = document.createElement('dl');
+        metaDl.className = 'kv student-vulnerabilities-meta';
+
+        if (scanData.lockfileVersion !== undefined && scanData.lockfileVersion !== null) {
+          const dtVer = document.createElement('dt');
+          dtVer.textContent = 'lockfileVersion';
+          const ddVer = document.createElement('dd');
+          ddVer.textContent = String(scanData.lockfileVersion);
+          metaDl.appendChild(dtVer);
+          metaDl.appendChild(ddVer);
+        }
+
+        if (scanData.lockfileHash) {
+          const dtHash = document.createElement('dt');
+          dtHash.textContent = 'lockfileHash';
+          const ddHash = document.createElement('dd');
+          ddHash.textContent = scanData.lockfileHash;
+          metaDl.appendChild(dtHash);
+          metaDl.appendChild(ddHash);
+        }
+
+        if (scanData.checkedAt) {
+          const dtChecked = document.createElement('dt');
+          dtChecked.textContent = 'checkedAt';
+          const ddChecked = document.createElement('dd');
+          ddChecked.textContent = scanData.checkedAt;
+          metaDl.appendChild(dtChecked);
+          metaDl.appendChild(ddChecked);
+        }
+
+        if (metaDl.children.length > 0) {
+          headerBox.appendChild(metaDl);
+        }
+        container.appendChild(headerBox);
+
+        // 패키지 목록 테이블/카드 구성
+        const pkgList = Array.isArray(scanData.packages) ? scanData.packages : [];
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'student-vulnerabilities-table-wrap';
+
+        if (pkgList.length === 0) {
+          const emptyNotice = document.createElement('p');
+          emptyNotice.className = 'student-empty';
+          if (scanStatus === 'not_configured' || scanStatus === 'unverifiable' || scanStatus === 'not_checked') {
+            emptyNotice.textContent = `표시할 패키지 정보가 없습니다. (현재 상태: ${scanStatusText})`;
+          } else {
+            emptyNotice.textContent = '조회된 패키지 목록이 없습니다.';
+          }
+          tableContainer.appendChild(emptyNotice);
+        } else {
+          const table = document.createElement('table');
+          table.className = 'student-vulnerabilities-table';
+
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          ['패키지명', '정확한 설치 버전', '상태', '출처(source)', '조회 시각', '취약점 항목(OSV)'].forEach((colText) => {
+            const th = document.createElement('th');
+            th.textContent = colText;
+            headerRow.appendChild(th);
+          });
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+
+          pkgList.forEach((pkg) => {
+            const tr = document.createElement('tr');
+            // 행 필수 속성: data-student-package-name, data-student-package-version
+            const pkgName = pkg.name || '확인 불가';
+            const pkgVersion = pkg.version || '확인 불가';
+            tr.setAttribute('data-student-package-name', pkgName);
+            tr.setAttribute('data-student-package-version', pkgVersion);
+
+            // 1) 패키지명
+            const tdName = document.createElement('td');
+            tdName.textContent = pkgName;
+            tr.appendChild(tdName);
+
+            // 2) 설치된 정확한 버전 (^ 범위 아님)
+            const tdVer = document.createElement('td');
+            tdVer.textContent = pkgVersion;
+            tr.appendChild(tdVer);
+
+            // 3) 패키지 상태
+            const tdStatus = document.createElement('td');
+            const pStatus = pkg.status || 'unverifiable';
+            const hasVulns = Array.isArray(pkg.vulnerabilities) && pkg.vulnerabilities.length > 0;
+
+            if (pStatus === 'known_vulnerabilities') {
+              tdStatus.textContent = '알려진 항목 있음(known_vulnerabilities)';
+              tdStatus.className = 'status-danger';
+            } else if (pStatus === 'none_found') {
+              tdStatus.textContent = '알려진 항목 없음(none_found)';
+              tdStatus.className = 'status-success';
+            } else if (pStatus === 'unverifiable') {
+              if (hasVulns) {
+                tdStatus.textContent = '일부 확인·전체 조회 확인 불가(unverifiable)';
+                tdStatus.className = 'status-warning';
+              } else {
+                tdStatus.textContent = '조회 확인 불가(unverifiable)';
+                tdStatus.className = 'status-warning';
+              }
+            } else {
+              tdStatus.textContent = `${pStatus}(unknown)`;
+            }
+            tr.appendChild(tdStatus);
+
+            // 4) 출처 (source)
+            const tdSource = document.createElement('td');
+            tdSource.textContent = pkg.source || '확인 불가';
+            tr.appendChild(tdSource);
+
+            // 5) 조회 시각 (checkedAt)
+            const tdTime = document.createElement('td');
+            tdTime.textContent = pkg.checkedAt || '확인 불가';
+            tr.appendChild(tdTime);
+
+            // 6) 취약점 항목 (id, modified)
+            const tdVulns = document.createElement('td');
+            if (hasVulns) {
+              const vulnUl = document.createElement('ul');
+              vulnUl.className = 'student-vuln-list';
+              pkg.vulnerabilities.forEach((v) => {
+                const li = document.createElement('li');
+                const vId = v.id || 'ID 없음';
+                const vMod = v.modified ? ` (수정 시각: ${v.modified})` : '';
+                li.textContent = `${vId}${vMod}`;
+                vulnUl.appendChild(li);
+              });
+              tdVulns.appendChild(vulnUl);
+            } else {
+              const noVulnText = document.createElement('span');
+              noVulnText.className = 'muted';
+              if (pStatus === 'none_found') {
+                noVulnText.textContent = '조회 범위에서 알려진 취약점 없음 (OSV DB 기준)';
+              } else if (pStatus === 'unverifiable') {
+                noVulnText.textContent = '취약점 여부 확인 불가 (조회 실패/미완료)';
+              } else {
+                noVulnText.textContent = '취약점 항목 없음';
+              }
+              tdVulns.appendChild(noVulnText);
+            }
+            tr.appendChild(tdVulns);
+
+            tbody.appendChild(tr);
+          });
+
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+        }
+
+        container.appendChild(tableContainer);
+
+        // OSV 한계 안내 고지
+        const disclaimer = document.createElement('p');
+        disclaimer.className = 'muted';
+        disclaimer.textContent = '안내: OSV는 알려진 취약점 데이터베이스입니다. none_found(알려진 항목 없음)는 공개 DB 조회 범위 내에 알려진 취약점이 없다는 뜻이며, 해당 패키지나 시스템 전체의 무결성 또는 완벽한 안전성을 보장하는 것은 아닙니다.';
+        container.appendChild(disclaimer);
+
+        if (modeText) {
+          const modeBadge = document.createElement('span');
+          modeBadge.className = 'tag tag-demo';
+          modeBadge.textContent = modeText;
+          container.appendChild(modeBadge);
+        }
+
+        return container;
+      }
+
+      // fallback
+      const fallback = document.createElement('p');
+      fallback.className = 'muted';
+      fallback.textContent = '확인 불가';
+      container.appendChild(fallback);
+      return container;
+    },
     renderAiConnection(context = {}) {
       const { status = 'idle', mode, data, error, checkedAt, explanationAccepted } = context || {};
       const container = document.createElement('div');
