@@ -1199,48 +1199,8 @@ export function createStudentView() {
       const container = document.createElement('div');
       container.className = 'student-explanation-container';
 
-      if (!event || !explanation || explanation.status === 'idle') {
-        const idleEl = document.createElement('p');
-        idleEl.className = 'state state-empty';
-        idleEl.textContent = '사건을 선택하고 AI 설명을 요청하세요.';
-        container.appendChild(idleEl);
-        return container;
-      }
-
-      if (explanation.status === 'loading') {
-        const loadingEl = document.createElement('p');
-        loadingEl.className = 'state state-loading';
-        loadingEl.textContent = 'AI 설명을 요청하는 중입니다...';
-        container.appendChild(loadingEl);
-        return container;
-      }
-
-      if (explanation.status === 'ok') {
-        // explanation.status가 ok일 때만 data-student-explanation-event에 event.id 부여
-        container.setAttribute('data-student-explanation-event', event.id || '');
-
-        const heading = document.createElement('h3');
-        heading.textContent = `사건 ${event.id || '확인 불가'} AI 설명`;
-        container.appendChild(heading);
-
-        const summaryEl = document.createElement('p');
-        summaryEl.className = 'student-explanation-summary';
-        const summaryText = explanation.data?.summary || '설명 요약 없음';
-        summaryEl.textContent = `요약: ${summaryText}`;
-        container.appendChild(summaryEl);
-
-        if (checkedAt) {
-          const timeEl = document.createElement('p');
-          timeEl.className = 'student-explanation-time muted';
-          timeEl.textContent = `설명 생성 시각: ${checkedAt}`;
-          container.appendChild(timeEl);
-        }
-
-        return container;
-      }
-
-      if (explanation.status === 'error') {
-        // 실패 시 data-student-explanation-event 속성을 붙이지 않음
+      // 1. explanation.status가 error인 경우 (event가 null이어도 오류와 실패 사유를 먼저 표시)
+      if (explanation?.status === 'error') {
         container.removeAttribute('data-student-explanation-event');
 
         const errorBox = document.createElement('div');
@@ -1251,18 +1211,252 @@ export function createStudentView() {
 
         const errorEl = document.createElement('p');
         errorEl.className = 'student-error';
-        errorEl.textContent = `AI 설명 요청 실패 [${code}]: ${message}`;
+        errorEl.textContent = `AI 설명 실패: [${code}] ${message}`;
         errorBox.appendChild(errorEl);
+
+        // 이미 실행했다고 답한 설명 또는 잘못된 출력 처리 안내
+        if (code === 'ON_AI_INVALID_OUTPUT') {
+          const badOutputNotice = document.createElement('p');
+          badOutputNotice.className = 'status-warning';
+          badOutputNotice.textContent = 'AI가 이미 실행했다고 답했거나 근거 형식이 맞지 않는 설명은 수용할 수 없습니다.';
+          errorBox.appendChild(badOutputNotice);
+        } else if (code === 'ON_AI_INVALID_INPUT') {
+          const badInputNotice = document.createElement('p');
+          badInputNotice.className = 'status-warning';
+          badInputNotice.textContent = '사건의 근거 또는 현재 상태가 올바르지 않아 설명 요청이 거절되었습니다.';
+          errorBox.appendChild(badInputNotice);
+        }
 
         const recordNotice = document.createElement('p');
         recordNotice.className = 'muted';
-        recordNotice.textContent = 'AI 설명 요청이 실패했으나 기존 보안 기록은 그대로 유지됩니다.';
+        recordNotice.textContent = 'AI 설명 요청이 실패했으나 기존 보안 기록은 그대로 유지됩니다. 과제 실패가 아닙니다.';
         errorBox.appendChild(recordNotice);
 
         container.appendChild(errorBox);
         return container;
       }
 
+      // 2. 오류 없이 event가 null이거나 선택 전인 경우
+      if (!event) {
+        container.removeAttribute('data-student-explanation-event');
+        const emptyEl = document.createElement('p');
+        emptyEl.className = 'state state-empty';
+        emptyEl.textContent = '보안 기록에서 기록을 먼저 고르세요.';
+        container.appendChild(emptyEl);
+        return container;
+      }
+
+      // 3. explanation이 아직 없거나 idle 상태인 경우
+      if (!explanation || explanation.status === 'idle') {
+        container.removeAttribute('data-student-explanation-event');
+        const idleEl = document.createElement('p');
+        idleEl.className = 'state state-empty';
+        idleEl.textContent = `사건 ${event.id || '확인 불가'}가 선택되었습니다. AI 설명을 요청하세요.`;
+        container.appendChild(idleEl);
+        return container;
+      }
+
+      // 4. loading 상태인 경우
+      if (explanation.status === 'loading') {
+        container.removeAttribute('data-student-explanation-event');
+        const loadingEl = document.createElement('p');
+        loadingEl.className = 'state state-loading';
+        loadingEl.textContent = '설명 요청 중입니다...';
+        container.appendChild(loadingEl);
+        return container;
+      }
+
+      // 5. ok 상태인 경우
+      if (explanation.status === 'ok') {
+        const data = explanation.data || {};
+        const eventEvidenceList = Array.isArray(event.evidence) ? event.evidence : [];
+        const evidenceMap = new Map(eventEvidenceList.map((e) => [e.id, e.text]));
+
+        // 근거 대조 및 검증: explanation.data.evidenceIds 확인
+        const evidenceIds = Array.isArray(data.evidenceIds) ? data.evidenceIds : [];
+        const hasMissingEvidence = evidenceIds.length === 0 || evidenceIds.some((id) => !evidenceMap.has(id));
+
+        // 이미 실행되었다고 잘못 표기된 경우(executed: true) 검증
+        const isExecutedInvalid = data.executed === true;
+
+        if (hasMissingEvidence || isExecutedInvalid) {
+          container.removeAttribute('data-student-explanation-event');
+
+          const rejectBox = document.createElement('div');
+          rejectBox.className = 'student-error-box';
+
+          const rejectTitle = document.createElement('p');
+          rejectTitle.className = 'student-error';
+          rejectTitle.textContent = isExecutedInvalid
+            ? 'AI 설명 수용 불가: AI가 이미 실행했다고 답한 설명은 쓸 수 없습니다.'
+            : 'AI 설명 수용 불가: 근거가 맞지 않음 (근거 ID가 event.evidence에 존재하지 않거나 부족합니다).';
+          rejectBox.appendChild(rejectTitle);
+
+          const rejectCode = document.createElement('p');
+          rejectCode.className = 'muted';
+          rejectCode.textContent = '오류 코드: ON_AI_INVALID_OUTPUT · 내용을 임의로 지어내지 않고 설명을 거절했습니다. 기록은 그대로입니다.';
+          rejectBox.appendChild(rejectCode);
+
+          container.appendChild(rejectBox);
+          return container;
+        }
+
+        // 성공한 경우에만 data-student-explanation-event 속성 부여
+        container.setAttribute('data-student-explanation-event', event.id || '');
+
+        // 1) 사건 ID, AI 설명 제목(참고용) 및 요약
+        const headerEl = document.createElement('div');
+        headerEl.className = 'student-explanation-header';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = `사건 ${event.id || '확인 불가'} — AI 설명(참고용)`;
+        headerEl.appendChild(titleEl);
+
+        const summaryBox = document.createElement('div');
+        summaryBox.className = 'student-explanation-summary-box';
+        const summaryLabel = document.createElement('strong');
+        summaryLabel.textContent = 'AI 요약: ';
+        summaryBox.appendChild(summaryLabel);
+        const summaryText = document.createElement('span');
+        summaryText.textContent = data.summary || '요약 없음';
+        summaryBox.appendChild(summaryText);
+        headerEl.appendChild(summaryBox);
+
+        if (checkedAt) {
+          const timeEl = document.createElement('p');
+          timeEl.className = 'student-explanation-time muted';
+          timeEl.textContent = `점검 시각: ${checkedAt}`;
+          headerEl.appendChild(timeEl);
+        }
+
+        container.appendChild(headerEl);
+
+        // 2) evidenceIds 마다 event.evidence에서 같은 id를 찾아 "근거 ID — 근거 글"
+        const evidenceSection = document.createElement('section');
+        evidenceSection.className = 'student-explanation-section';
+        const evidenceTitle = document.createElement('h4');
+        evidenceTitle.textContent = '인용한 근거 (evidence)';
+        evidenceSection.appendChild(evidenceTitle);
+
+        const evidenceUl = document.createElement('ul');
+        evidenceUl.className = 'student-explanation-evidence-list';
+        evidenceIds.forEach((evId) => {
+          const li = document.createElement('li');
+          const evText = evidenceMap.get(evId) || '근거 글 없음';
+          li.textContent = `${evId} — ${evText}`;
+          evidenceUl.appendChild(li);
+        });
+        evidenceSection.appendChild(evidenceUl);
+        container.appendChild(evidenceSection);
+
+        // 3) event.rules 마다 "규칙 ID — 규칙 글" (id와 text를 함께)
+        const rulesSection = document.createElement('section');
+        rulesSection.className = 'student-explanation-section';
+        const rulesTitle = document.createElement('h4');
+        rulesTitle.textContent = '적용 규칙 (rules)';
+        rulesSection.appendChild(rulesTitle);
+
+        const eventRulesList = Array.isArray(event.rules) ? event.rules : [];
+        if (eventRulesList.length === 0) {
+          const noRules = document.createElement('p');
+          noRules.className = 'muted';
+          noRules.textContent = '적용된 규칙 없음';
+          rulesSection.appendChild(noRules);
+        } else {
+          const rulesUl = document.createElement('ul');
+          rulesUl.className = 'student-explanation-rules-list';
+          eventRulesList.forEach((rule) => {
+            const li = document.createElement('li');
+            li.textContent = `${rule.id || '확인 불가'} — ${rule.text || '규칙 설명 없음'}`;
+            rulesUl.appendChild(li);
+          });
+          rulesSection.appendChild(rulesUl);
+        }
+        container.appendChild(rulesSection);
+
+        // 4) event.state에서 unknown인 항목을 접속·세션·기기별로 나눠 확인 불가 및 원래 값(unknown) 나열
+        const stateSection = document.createElement('section');
+        stateSection.className = 'student-explanation-section';
+        const stateTitle = document.createElement('h4');
+        stateTitle.textContent = '확인 불가 상태 (unknown)';
+        stateSection.appendChild(stateTitle);
+
+        const evState = event.state || {};
+        const unknownEntries = [];
+        if (evState.access === 'unknown') {
+          unknownEntries.push('접속: 확인 불가(unknown)');
+        }
+        if (evState.session === 'unknown') {
+          unknownEntries.push('세션: 확인 불가(unknown)');
+        }
+        if (evState.device === 'unknown') {
+          unknownEntries.push('기기: 확인 불가(unknown)');
+        }
+
+        if (unknownEntries.length === 0) {
+          const noUnknown = document.createElement('p');
+          noUnknown.className = 'muted';
+          noUnknown.textContent = '확인 불가 상태: 없음 (모든 상태 확인됨)';
+          stateSection.appendChild(noUnknown);
+        } else {
+          const stateNotice = document.createElement('p');
+          stateNotice.className = 'status-warning';
+          stateNotice.textContent = '아래 상태는 서버가 알지 못하는 확인 불가 상태이며 정상이나 안전으로 판단하지 않습니다.';
+          stateSection.appendChild(stateNotice);
+
+          const stateUl = document.createElement('ul');
+          unknownEntries.forEach((entryText) => {
+            const li = document.createElement('li');
+            li.textContent = entryText;
+            stateUl.appendChild(li);
+          });
+          stateSection.appendChild(stateUl);
+        }
+        container.appendChild(stateSection);
+
+        // 5) proposals 처리
+        const proposalsSection = document.createElement('section');
+        proposalsSection.className = 'student-explanation-section';
+        const proposalsTitle = document.createElement('h4');
+        proposalsTitle.textContent = 'AI 조치 제안 (proposals)';
+        proposalsSection.appendChild(proposalsTitle);
+
+        const proposalsList = Array.isArray(data.proposals) ? data.proposals : [];
+        const supportedActions = Array.isArray(event.supportedActions) ? event.supportedActions : [];
+
+        if (proposalsList.length === 0) {
+          const emptyProposal = document.createElement('p');
+          emptyProposal.className = 'muted';
+          if (supportedActions.length === 0) {
+            emptyProposal.textContent = '연동 시스템이 지원하는 조치가 없어 제안이 없습니다(정상).';
+          } else {
+            emptyProposal.textContent = 'AI가 제안한 조치가 없습니다.';
+          }
+          proposalsSection.appendChild(emptyProposal);
+        } else {
+          // 6) proposals가 있는 경우: 각 action과 reason, 사람 확인 필요 및 미실행 상태 명시
+          const cautionNotice = document.createElement('p');
+          cautionNotice.className = 'status-warning';
+          cautionNotice.textContent = '사람 확인이 필요하며 실행되지 않았습니다. (AI 설명 및 제안만으로 보안 조치가 자동 실행되지 않습니다.)';
+          proposalsSection.appendChild(cautionNotice);
+
+          const proposalsUl = document.createElement('ul');
+          proposalsList.forEach((prop) => {
+            const li = document.createElement('li');
+            const actName = prop.action || '조치 확인 불가';
+            const actReason = prop.reason || '사유 없음';
+            li.textContent = `조치 제안: ${actName} — 사유: ${actReason} (상태: 미실행 / 사람 확인 대기)`;
+            proposalsUl.appendChild(li);
+          });
+          proposalsSection.appendChild(proposalsUl);
+        }
+        container.appendChild(proposalsSection);
+
+        return container;
+      }
+
+      // 알 수 없는 상태
+      container.removeAttribute('data-student-explanation-event');
       const fallback = document.createElement('p');
       fallback.className = 'muted';
       fallback.textContent = '확인 불가';
