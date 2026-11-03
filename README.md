@@ -30,3 +30,5 @@ npm start도 같은 서버를 켭니다. 기본 실행은 실제 회사 시스�
 ## 학생 실행 설명서 및 구성도
 
 자세한 학생용 실행 설명서, 시스템 구성도, 실패 해결 안내 및 구현 범위는 [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md)를 참고하세요.
+
+- 최종 릴리스 및 새 환경 재현 기록: [docs/RELEASE_REPRODUCTION.md](docs/RELEASE_REPRODUCTION.md)
