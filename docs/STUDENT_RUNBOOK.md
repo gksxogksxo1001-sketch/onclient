@@ -10,8 +10,9 @@
 * **런타임 및 엔진**:
   * **Node.js**: `v24.19.0` (지원 범위: Node.js 22 ~ 24, 외부 npm 의존성 없음)
   * **Git**: `2.56.0` 이상
-* **이동 가능한 경로 원칙**:
-  * 특정 사용자의 절대 경로(`C:\Users\...`)에 의존하지 않으며, 모든 실행 명령은 프로젝트 루트 상대 경로(`.`)를 기준으로 동작합니다.
+* **이동 가능한 구성 원칙 (Portable Readiness)**:
+  * 특정 사용자의 절대 경로(`C:\Users\...`)에 의존하지 않으며, 모든 실행 명령은 프로젝트 루트 상대 경로(`.`)를 기준으로 작성되었습니다.
+  * Windows에서는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` 또는 `npm start`를 사용할 수 있습니다.
 * **보안 및 비밀값 격리 준수**:
   * API 키, 사용자 비밀번호, 인증 토큰, 세션 쿠키 등의 민감 정보는 문서 및 코드에 일절 기재하지 않습니다.
   * 환경 설정 파일(`.env`)은 저장소 제출 대상에서 제외되며 `.env.example` 템플릿만 제공됩니다.
@@ -21,7 +22,7 @@
 ## 2. 프로젝트 폴더 구조
 
 ```text
-onclient/
+.
 ├── docs/                        # 공통 과제 안내, 프롬프트, 커리큘럼 및 학생 문서
 │   ├── CURRICULUM.json          # 단계별 평가 항목 및 세부 계약
 │   ├── STUDENT_PROMPTS.md       # 13~22단계 상세 안내 프롬프트
@@ -37,7 +38,7 @@ onclient/
 │   └── vulnerabilities/         # OSV 프로젝트 스캔 모듈
 ├── student/                     # [학생 구현 영역]
 │   └── extension.mjs            # 단계별 학생 뷰 렌더러 함수 모음 (createStudentView)
-├── tools/                       # 실행 보조 스크립트
+├── tools/                       # 실행 보조 스크립트 (start-alekov.ps1 등)
 ├── .env.example                 # 비밀 없는 기본 환경 설정 템플릿
 ├── package.json                 # 실행 스크립트 및 Node 엔진 정의
 └── README.md                    # 프로젝트 기본 소개 및 안내
@@ -50,14 +51,18 @@ onclient/
 ### 3.1. 셸 열기 및 프로젝트 위치 이동
 PowerShell 또는 Bash 셸을 열고 프로젝트 최상위 디렉터리로 이동합니다.
 ```powershell
-# 프로젝트 루트 디렉터리로 이동 (상대 경로 예시)
-cd ./onclient
+# 프로젝트 루트 디렉터리에서 작업 수행
+cd .
 ```
 
 ### 3.2. 환경 설정 파일 준비 (.env.example 기반)
 필요 시 `.env.example` 파일을 복사하여 로컬 실행 설정(`.env`)을 생성합니다 (별도 수정 없이 기본값으로 동작 가능).
 ```powershell
+# PowerShell
 Copy-Item .env.example .env
+
+# Bash
+cp .env.example .env
 ```
 * **기본 설정 내용**:
   * `ON_PORT=5189`: 로컬 서버 포트
@@ -77,7 +82,13 @@ npm run check
 ### 3.4. 서버 실행 명령
 서버 실행은 아래 명령 중 하나를 사용할 수 있습니다.
 
-1. **표준 로컬 연결 모드 실행**:
+1. **도구 스크립트로 실행 (권장)**:
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+   ```
+   * **정상 시작 신호**: 콘솔에 `케셰브 연결 확인: http://127.0.0.1:5189` 출력.
+
+2. **표준 로컬 연결 모드 실행**:
    ```powershell
    npm start
    # 또는: node src/server.mjs
@@ -88,7 +99,7 @@ npm run check
      케셰브 연결 확인: http://127.0.0.1:5189
      ```
 
-2. **예제 자료(Demo) 모드 실행**:
+3. **예제 자료(Demo) 모드 실행**:
    ```powershell
    npm run demo
    # 또는: node src/server.mjs --demo
@@ -187,7 +198,7 @@ flowchart TD
 ## 7. 실제 지원 범위 및 미확인(UNV) 항목 명시
 
 * **실제 확인 완료된 기능 (Verified)**:
-  * 로컬 Node.js 서버(`src/server.mjs`) 구동 및 loopback(`127.0.0.1:5189`) 응답
+  * 단일 Node.js 24.19.0 환경에서 무의존성으로 서버 구동 및 로컬 루프백(`127.0.0.1:5189`) 통신 완료.
   * `student/extension.mjs`의 모든 렌더링 함수(`renderIdentity` ~ `renderVulnerabilities`)에 대한 단위 테스트 및 구문 무결성 통과
   * DOM API (`createElement`, `textContent`) 및 키보드 접근성 유지
   * 상태별 문구 분리(오류, 로딩, 빈 목록, 성공, 확인 불가 구분)
