@@ -11,7 +11,7 @@
   * **Node.js**: `v24.19.0` (지원 범위: Node.js 22 ~ 24, 외부 npm 의존성 없음)
   * **Git**: `2.56.0` 이상
 * **이동 가능한 구성 원칙 (Portable Readiness)**:
-  * 특정 사용자의 절대 경로(`C:\Users\...`)에 의존하지 않으며, 모든 실행 명령은 프로젝트 루트 상대 경로(`.`)를 기준으로 작성되었습니다.
+  * 특정 운영체제나 사용자 환경의 절대 경로에 의존하지 않으며, 모든 실행 명령은 프로젝트 루트 상대 경로(`.`)를 기준으로 작성되었습니다.
   * Windows에서는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` 또는 `npm start`를 사용할 수 있습니다.
 * **보안 및 비밀값 격리 준수**:
   * API 키, 사용자 비밀번호, 인증 토큰, 세션 쿠키 등의 민감 정보는 문서 및 코드에 일절 기재하지 않습니다.
@@ -27,6 +27,7 @@
 │   ├── CURRICULUM.json          # 단계별 평가 항목 및 세부 계약
 │   ├── STUDENT_PROMPTS.md       # 13~22단계 상세 안내 프롬프트
 │   ├── STUDENT_RUNBOOK.md       # [본 문서] 학생용 실행 설명서 및 시스템 구성도
+│   ├── NEW_ENV_RUN.md           # 22단계 새 환경 실행과 단계별 재현 기록
 │   └── RELEASE_REPRODUCTION.md  # 최종 릴리스 및 새 환경 재현 기록서
 ├── public/                      # 제공 웹 화면 정적 파일 (수정 금지)
 │   ├── index.html               # 단일 페이지 애플리케이션 진입점
