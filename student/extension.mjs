@@ -54,7 +54,10 @@ function getModeText(mode) {
   return MODE_LABELS[mode] || null;
 }
 
-export function createStudentView() {
+export function createStudentView({ api, onChange } = {}) {
+  // 관제 대시보드용 외부 서비스 예시 토글 상태
+  let showGithubExample = false;
+
   return {
     renderIdentity(context = {}) {
       const { me, devices, sessions } = context || {};
@@ -743,6 +746,341 @@ export function createStudentView() {
 
       const modeText = getModeText(mode);
 
+      // =========================================================================
+      // [작전: 관제 대시보드형 틀] 맨 위 상태 카드 네 개
+      // =========================================================================
+      const dashboardHeader = document.createElement('div');
+      dashboardHeader.className = 'dashboard-header';
+      dashboardHeader.style.marginBottom = '16px';
+      dashboardHeader.style.paddingBottom = '8px';
+      dashboardHeader.style.borderBottom = '1px solid #334155';
+
+      const dashTitle = document.createElement('h2');
+      dashTitle.textContent = '케셰브 종합 관제 대시보드 (Keshev Dashboard)';
+      dashTitle.style.margin = '0 0 6px 0';
+      dashboardHeader.appendChild(dashTitle);
+
+      const dashDesc = document.createElement('p');
+      dashDesc.className = 'muted';
+      dashDesc.style.margin = '0 0 8px 0';
+      dashDesc.textContent = '내 PC 상태·기기 신원·세션 신뢰 및 외부 서비스 접속 신뢰를 실측치와 예시로 구분하여 모니터링합니다.';
+      dashboardHeader.appendChild(dashDesc);
+
+      const controlBar = document.createElement('div');
+      controlBar.style.display = 'flex';
+      controlBar.style.gap = '8px';
+      controlBar.style.alignItems = 'center';
+
+      const localBadge = document.createElement('span');
+      localBadge.className = 'tag tag-info';
+      localBadge.textContent = '실측 기준: 로컬 루프백 PC 환경';
+      controlBar.appendChild(localBadge);
+
+      const toggleExampleBtn = document.createElement('button');
+      toggleExampleBtn.type = 'button';
+      toggleExampleBtn.className = 'btn btn-sm';
+      toggleExampleBtn.textContent = showGithubExample ? '외부 서비스 예시 끄기 [연결 전 복귀]' : '외부 서비스 예시 보기 [GitHub 연동]';
+      toggleExampleBtn.addEventListener('click', () => {
+        showGithubExample = !showGithubExample;
+        if (typeof onChange === 'function') {
+          onChange();
+        }
+      });
+      controlBar.appendChild(toggleExampleBtn);
+      dashboardHeader.appendChild(controlBar);
+      container.appendChild(dashboardHeader);
+
+      // --- 상단 4대 관제 카드 컨테이너 (Grid) ---
+      const cardsGrid = document.createElement('div');
+      cardsGrid.className = 'dashboard-cards-grid';
+      cardsGrid.style.display = 'grid';
+      cardsGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+      cardsGrid.style.gap = '12px';
+      cardsGrid.style.marginBottom = '20px';
+
+      // [카드 1: 내 PC 상태]
+      const cardPc = document.createElement('div');
+      cardPc.className = 'card';
+      cardPc.style.padding = '12px';
+      cardPc.style.backgroundColor = '#1e293b';
+      cardPc.style.borderRadius = '6px';
+      cardPc.style.border = '1px solid #334155';
+
+      const cardPcHeader = document.createElement('div');
+      cardPcHeader.style.display = 'flex';
+      cardPcHeader.style.justifyContent = 'space-between';
+      cardPcHeader.style.alignItems = 'center';
+      cardPcHeader.style.marginBottom = '6px';
+
+      const cardPcTitle = document.createElement('strong');
+      cardPcTitle.textContent = '1. 내 PC 상태';
+      const badgePc = document.createElement('span');
+      badgePc.className = 'tag tag-ok';
+      badgePc.textContent = '[실측 / 안내]';
+      cardPcHeader.appendChild(cardPcTitle);
+      cardPcHeader.appendChild(badgePc);
+      cardPc.appendChild(cardPcHeader);
+
+      const cardPcBody = document.createElement('div');
+      const pcMetricText = document.createElement('p');
+      pcMetricText.style.margin = '4px 0';
+      pcMetricText.textContent = '관측 대상: CPU·메모리·디스크·방화벽·이벤트';
+      const pcStatusText = document.createElement('p');
+      pcStatusText.className = 'muted';
+      pcStatusText.style.margin = '4px 0';
+      pcStatusText.textContent = '수집 범위 5대 지표는 상단 제공 카드에서 실측 중입니다.';
+      const pcLimitText = document.createElement('p');
+      pcLimitText.className = 'muted';
+      pcLimitText.style.fontSize = '0.85em';
+      pcLimitText.style.margin = '4px 0';
+      pcLimitText.textContent = '※ 학생 API 직접 조회는 NOT_ALLOWED (지원 없음 안내), 1회 표본으로 침해 단정 불가';
+      cardPcBody.appendChild(pcMetricText);
+      cardPcBody.appendChild(pcStatusText);
+      cardPcBody.appendChild(pcLimitText);
+      cardPc.appendChild(cardPcBody);
+      cardsGrid.appendChild(cardPc);
+
+      // [카드 2: 사용자 & 기기 신원]
+      const cardId = document.createElement('div');
+      cardId.className = 'card';
+      cardId.style.padding = '12px';
+      cardId.style.backgroundColor = '#1e293b';
+      cardId.style.borderRadius = '6px';
+      cardId.style.border = '1px solid #334155';
+
+      const cardIdHeader = document.createElement('div');
+      cardIdHeader.style.display = 'flex';
+      cardIdHeader.style.justifyContent = 'space-between';
+      cardIdHeader.style.alignItems = 'center';
+      cardIdHeader.style.marginBottom = '6px';
+
+      const cardIdTitle = document.createElement('strong');
+      cardIdTitle.textContent = '2. 로그인 & 기기 신원';
+      const badgeId = document.createElement('span');
+      badgeId.className = 'tag tag-ok';
+      badgeId.textContent = '[실측]';
+      cardIdHeader.appendChild(cardIdTitle);
+      cardIdHeader.appendChild(badgeId);
+      cardId.appendChild(cardIdHeader);
+
+      const cardIdBody = document.createElement('div');
+      const devList = Array.isArray(devices?.data) ? devices.data : [];
+      const devCount = devList.length;
+      const primaryDev = devList[0];
+      const idStatusText = document.createElement('p');
+      idStatusText.style.margin = '4px 0';
+      if (devices?.status === 'ok') {
+        const statusLabel = primaryDev ? formatDeviceStatus(primaryDev.status) : '등록 기기 없음';
+        idStatusText.textContent = `현재 기기: ${statusLabel} (${devCount}대 등록)`;
+      } else if (devices?.status === 'loading') {
+        idStatusText.textContent = '기기 정보 조회 중...';
+      } else {
+        idStatusText.textContent = '기기 신원: 확인 불가';
+      }
+      const idLimitText = document.createElement('p');
+      idLimitText.className = 'muted';
+      idLimitText.style.fontSize = '0.85em';
+      idLimitText.style.margin = '4px 0';
+      idLimitText.textContent = '※ 내 계정에 등록된 기기 목록 기준이며 과거 기기 전체 이력이 아님';
+      cardIdBody.appendChild(idStatusText);
+      cardIdBody.appendChild(idLimitText);
+      cardId.appendChild(cardIdBody);
+      cardsGrid.appendChild(cardId);
+
+      // [카드 3: 세션 보안 신뢰]
+      const cardSess = document.createElement('div');
+      cardSess.className = 'card';
+      cardSess.style.padding = '12px';
+      cardSess.style.backgroundColor = '#1e293b';
+      cardSess.style.borderRadius = '6px';
+      cardSess.style.border = '1px solid #334155';
+
+      const cardSessHeader = document.createElement('div');
+      cardSessHeader.style.display = 'flex';
+      cardSessHeader.style.justifyContent = 'space-between';
+      cardSessHeader.style.alignItems = 'center';
+      cardSessHeader.style.marginBottom = '6px';
+
+      const cardSessTitle = document.createElement('strong');
+      cardSessTitle.textContent = '3. 세션 보안 신뢰';
+      const badgeSess = document.createElement('span');
+      badgeSess.className = 'tag tag-ok';
+      badgeSess.textContent = '[실측]';
+      cardSessHeader.appendChild(cardSessTitle);
+      cardSessHeader.appendChild(badgeSess);
+      cardSess.appendChild(cardSessHeader);
+
+      const cardSessBody = document.createElement('div');
+      const sessList = Array.isArray(sessions?.data) ? sessions.data : [];
+      const primarySess = sessList[0];
+      const sessStatusText = document.createElement('p');
+      sessStatusText.style.margin = '4px 0';
+      if (sessions?.status === 'ok') {
+        const sessLabel = primarySess ? formatSessionStatus(primarySess.status) : '현재 연결 없음';
+        sessStatusText.textContent = `세션 상태: ${sessLabel}`;
+      } else if (sessions?.status === 'loading') {
+        sessStatusText.textContent = '세션 정보 조회 중...';
+      } else {
+        sessStatusText.textContent = '세션 상태: 확인 불가';
+      }
+      const sessLimitText = document.createElement('p');
+      sessLimitText.className = 'muted';
+      sessLimitText.style.fontSize = '0.85em';
+      sessLimitText.style.margin = '4px 0';
+      sessLimitText.textContent = '※ 현재 검증된 단일 연결 대상이며 과거 세션 전체 목록이 아님';
+      cardSessBody.appendChild(sessStatusText);
+      cardSessBody.appendChild(sessLimitText);
+      cardSess.appendChild(cardSessBody);
+      cardsGrid.appendChild(cardSess);
+
+      // [카드 4: 외부 서비스 (GitHub)]
+      const cardGh = document.createElement('div');
+      cardGh.className = 'card';
+      cardGh.style.padding = '12px';
+      cardGh.style.backgroundColor = '#1e293b';
+      cardGh.style.borderRadius = '6px';
+      cardGh.style.border = '1px solid #334155';
+
+      const cardGhHeader = document.createElement('div');
+      cardGhHeader.style.display = 'flex';
+      cardGhHeader.style.justifyContent = 'space-between';
+      cardGhHeader.style.alignItems = 'center';
+      cardGhHeader.style.marginBottom = '6px';
+
+      const cardGhTitle = document.createElement('strong');
+      cardGhTitle.textContent = '4. 외부 서비스: GitHub';
+      const badgeGh = document.createElement('span');
+      if (showGithubExample) {
+        badgeGh.className = 'tag tag-demo';
+        badgeGh.textContent = '[예시]';
+      } else {
+        badgeGh.className = 'tag tag-warn';
+        badgeGh.textContent = '[연결 전]';
+      }
+      cardGhHeader.appendChild(cardGhTitle);
+      cardGhHeader.appendChild(badgeGh);
+      cardGh.appendChild(cardGhHeader);
+
+      const cardGhBody = document.createElement('div');
+      if (!showGithubExample) {
+        const ghConn = document.createElement('p');
+        ghConn.style.margin = '4px 0';
+        ghConn.textContent = '연결 상태: 연결 전 · 확인 불가';
+        const ghSec = document.createElement('p');
+        ghSec.className = 'muted';
+        ghSec.style.margin = '4px 0';
+        ghSec.textContent = '2단계 인증(2FA): 확인 불가 (0원이나 정상으로 단정하지 않음)';
+        const ghCost = document.createElement('p');
+        ghCost.className = 'muted';
+        ghCost.style.margin = '4px 0';
+        ghCost.textContent = '월 청구 금액: 확인 불가';
+        cardGhBody.appendChild(ghConn);
+        cardGhBody.appendChild(ghSec);
+        cardGhBody.appendChild(ghCost);
+      } else {
+        const ghConn = document.createElement('p');
+        ghConn.style.margin = '4px 0';
+        ghConn.textContent = '대상: student-org (개인 계정) [예시]';
+        const ghSec = document.createElement('p');
+        ghSec.style.margin = '4px 0';
+        ghSec.textContent = '2단계 인증: 켜짐 [예시] (출처: GitHub user:org)';
+        const ghCost = document.createElement('p');
+        ghCost.style.margin = '4px 0';
+        ghCost.textContent = '월 실적 비용: USD 0.00 [예시]';
+        const ghCostDetail = document.createElement('p');
+        ghCostDetail.className = 'muted';
+        ghCostDetail.style.fontSize = '0.85em';
+        ghCostDetail.style.margin = '4px 0';
+        ghCostDetail.textContent = '청구월: 2026-11, 실적 비용, Free 플랜 크레딧 내, 세금 별도, Actions 420/2,000분 사용';
+        cardGhBody.appendChild(ghConn);
+        cardGhBody.appendChild(ghSec);
+        cardGhBody.appendChild(ghCost);
+        cardGhBody.appendChild(ghCostDetail);
+      }
+      cardGh.appendChild(cardGhBody);
+      cardsGrid.appendChild(cardGh);
+
+      container.appendChild(cardsGrid);
+
+      // =========================================================================
+      // [작전: 하단 추이와 기록] 이상 징후 관측 근거 목록 (Observations & Limits)
+      // =========================================================================
+      const anomalySection = document.createElement('section');
+      anomalySection.className = 'student-status-section';
+      anomalySection.style.marginBottom = '20px';
+      anomalySection.style.padding = '12px';
+      anomalySection.style.backgroundColor = '#0f172a';
+      anomalySection.style.borderRadius = '6px';
+      anomalySection.style.border = '1px solid #1e293b';
+
+      const anomalyTitle = document.createElement('h3');
+      anomalyTitle.textContent = '접속 신뢰 추이 및 이상 징후 관측 근거 (Observations & Limits)';
+      anomalyTitle.style.marginTop = '0';
+      anomalySection.appendChild(anomalyTitle);
+
+      const anomalyNotice = document.createElement('p');
+      anomalyNotice.className = 'muted';
+      anomalyNotice.textContent = '종합 보안 점수나 "이상 없음" 판정을 내리지 않고, 실제 관찰된 사실과 그 사실만으로 말할 수 없는 기술적 한계를 나열합니다.';
+      anomalySection.appendChild(anomalyNotice);
+
+      const anomalyList = document.createElement('ul');
+      anomalyList.className = 'records';
+      anomalyList.style.listStyle = 'none';
+      anomalyList.style.padding = '0';
+
+      // 항목 1: Windows 방화벽
+      const liFw = document.createElement('li');
+      liFw.style.padding = '6px 0';
+      liFw.style.borderBottom = '1px solid #1e293b';
+      liFw.textContent = '[관측: 실측] Windows 방화벽 프로필 정상 가동 확인 → [한계] 방화벽 가동 사실만으로 모든 침해 및 네트워크 위협이 방지됨을 뜻하지 않음';
+      anomalyList.appendChild(liFw);
+
+      // 항목 2: 시스템 리소스 표본
+      const liRes = document.createElement('li');
+      liRes.style.padding = '6px 0';
+      liRes.style.borderBottom = '1px solid #1e293b';
+      liRes.textContent = '[관측: 실측] CPU 및 메모리 200ms 표본 수집 → [한계] 단일 표본 수치만으로 악성 프로그램 동작 여부를 단정할 수 없음';
+      anomalyList.appendChild(liRes);
+
+      // 항목 3: 외부 서비스 계정 보안 (GitHub)
+      const liGh = document.createElement('li');
+      liGh.style.padding = '6px 0';
+      liGh.style.borderBottom = '1px solid #1e293b';
+      if (showGithubExample) {
+        liGh.textContent = '[관측: 예시] GitHub 2FA 가동 확인 [예시] → [한계] 계정 2FA가 저장소 내부 코드의 무결성이나 시크릿 유출 없음을 보증하지 않음';
+      } else {
+        liGh.textContent = '[관측: 연결 전] GitHub 계정 연결 전 · 확인 불가 → [한계] 확인 불가 상태는 정상 또는 안전을 뜻하지 않음';
+      }
+      anomalyList.appendChild(liGh);
+
+      // 항목 4: 주의 알림 연동
+      const notiList = Array.isArray(notifications) ? notifications : [];
+      const liNoti = document.createElement('li');
+      liNoti.style.padding = '6px 0';
+      if (notiList.length === 0) {
+        liNoti.textContent = '[관측: 실측] 현재 등록된 시스템 주의 알림 없음 → [한계] 알림 0건이 보안 위험이 전혀 없음을 의미하지 않음';
+      } else {
+        liNoti.textContent = `[관측: 실측] 시스템 주의 알림 ${notiList.length}건 등록됨 → [한계] 상세 조치 여부는 원천 지원 여부 확인 필요`;
+      }
+      anomalyList.appendChild(liNoti);
+
+      anomalySection.appendChild(anomalyList);
+      container.appendChild(anomalySection);
+
+      // =========================================================================
+      // [기존 16단계 검증 유지] 상세 기기·세션·알림·안전 진단 패널 (Collapsible / Details)
+      // =========================================================================
+      const detailContainer = document.createElement('details');
+      detailContainer.setAttribute('open', '');
+      detailContainer.style.marginTop = '16px';
+
+      const detailSummary = document.createElement('summary');
+      detailSummary.style.cursor = 'pointer';
+      detailSummary.style.fontWeight = 'bold';
+      detailSummary.style.padding = '8px 0';
+      detailSummary.textContent = '▼ 기기·세션·알림·진단 정보 상세 점검 패널 (16단계 점검)';
+      detailContainer.appendChild(detailSummary);
+
       // --- 1. 기기 목록 (devices) ---
       const devicesSection = document.createElement('section');
       devicesSection.className = 'student-status-section';
@@ -781,7 +1119,6 @@ export function createStudentView() {
 
         devicesSection.appendChild(errorBox);
       } else if (devices?.status === 'ok') {
-        const devList = Array.isArray(devices.data) ? devices.data : [];
         if (devList.length === 0) {
           const emptyEl = document.createElement('p');
           emptyEl.className = 'student-empty';
@@ -805,7 +1142,7 @@ export function createStudentView() {
         fallback.textContent = '확인 불가';
         devicesSection.appendChild(fallback);
       }
-      container.appendChild(devicesSection);
+      detailContainer.appendChild(devicesSection);
 
       // --- 2. 세션 정보 (sessions) ---
       const sessionsSection = document.createElement('section');
@@ -850,7 +1187,6 @@ export function createStudentView() {
 
         sessionsSection.appendChild(errorBox);
       } else if (sessions?.status === 'ok') {
-        const sessList = Array.isArray(sessions.data) ? sessions.data : [];
         if (sessList.length === 0) {
           const emptyEl = document.createElement('p');
           emptyEl.className = 'student-empty';
@@ -874,7 +1210,7 @@ export function createStudentView() {
         fallback.textContent = '확인 불가';
         sessionsSection.appendChild(fallback);
       }
-      container.appendChild(sessionsSection);
+      detailContainer.appendChild(sessionsSection);
 
       // --- 3. 알림 (notifications) ---
       const notiSection = document.createElement('section');
@@ -883,7 +1219,6 @@ export function createStudentView() {
       notiTitle.textContent = '알림';
       notiSection.appendChild(notiTitle);
 
-      const notiList = Array.isArray(notifications) ? notifications : [];
       if (notiList.length === 0) {
         const emptyNoti = document.createElement('p');
         emptyNoti.className = 'student-empty';
@@ -902,7 +1237,7 @@ export function createStudentView() {
         });
         notiSection.appendChild(notiUl);
       }
-      container.appendChild(notiSection);
+      detailContainer.appendChild(notiSection);
 
       // --- 4. 진단 정보 (diagnostics) ---
       const diagSection = document.createElement('section');
@@ -1031,7 +1366,9 @@ export function createStudentView() {
         diagNotice.textContent = '진단 정보가 아직 조회되지 않았습니다. 제공 화면의 점검 기능을 사용하세요.';
         diagSection.appendChild(diagNotice);
       }
-      container.appendChild(diagSection);
+      detailContainer.appendChild(diagSection);
+
+      container.appendChild(detailContainer);
 
       if (modeText) {
         const modeBadge = document.createElement('span');
